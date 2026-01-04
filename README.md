@@ -40,3 +40,21 @@ Building on my experience with NLP-powered parsers and real-time interactive sys
    ```bash
    git clone [https://github.com/Parth04Dalvi/ImposterAI.git](https://github.com/Parth04Dalvi/ImposterAI.git)
    cd ImposterAI
+
+   Setup Environment Variables (.env):
+
+Code snippet
+
+GEMINI_API_KEY=your_api_key_here
+MONGO_URI=your_mongodb_connection_string
+Launch with Docker Compose:
+
+Bash
+
+docker-compose up --build
+📈 Future Roadmap
+Audio Integration: Implementing Voice-to-Text feedback loops to allow verbal interaction with the imposter.
+
+Behavioral Analytics: Creating a dashboard to track "Success Rates" of different AI personalities against human players.
+
+Zero-Trust Security: Implementing identity-based access for game rooms using JWT Authentication.
