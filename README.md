@@ -42,7 +42,7 @@ Clone the repository:
 
 Bash
 
-git clone https://github.com/Parth04Dalvi/ImposterAI.git
+git clone 
 cd ImposterAI
 Setup Environment Variables (.env):
 
