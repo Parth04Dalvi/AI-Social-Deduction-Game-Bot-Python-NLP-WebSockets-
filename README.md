@@ -1,4 +1,4 @@
-ImposterAI: Multi-Agent Social Deduction Engine
+# ImposterAI: Multi-Agent Social Deduction Engine
 ImposterAI is a real-time, LLM-powered social deduction game where players must identify a hidden AI "Imposter" among human participants. This engine utilizes a Stateful Game Manager and Persona-Conditioned Logic to simulate strategic deception and human-like interaction patterns.
 
 Technical Overview
