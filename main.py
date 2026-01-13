@@ -1,4 +1,4 @@
-import os, json, random
+import os, json, random, asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from typing import List, Dict
 import google.generativeai as genai
@@ -7,16 +7,19 @@ app = FastAPI()
 genai.configure(api_key="YOUR_GEMINI_API_KEY")
 model = genai.GenerativeModel('gemini-pro')
 
-class GameEngine:
+class GameManager:
     def __init__(self):
         self.players = {} # {client_id: {"role": "crew", "votes": 0}}
-        self.phase = "DISCUSSION" # DISCUSSION or VOTING
         self.imposter_id = None
+        self.game_active = False
 
     def start_game(self, player_ids: List[str]):
         self.imposter_id = random.choice(player_ids)
         for pid in player_ids:
             self.players[pid] = {"role": "imposter" if pid == self.imposter_id else "crew", "votes": 0}
+        self.game_active = True
+
+manager = GameManager()
 
 class ConnectionManager:
     def __init__(self):
@@ -27,53 +30,42 @@ class ConnectionManager:
         self.active_connections[client_id] = websocket
 
     def disconnect(self, client_id: str):
-        del self.active_connections[client_id]
+        if client_id in self.active_connections:
+            del self.active_connections[client_id]
 
     async def broadcast(self, message: dict):
         for connection in self.active_connections.values():
             await connection.send_json(message)
 
-game = GameEngine()
-manager = ConnectionManager()
+conn_manager = ConnectionManager()
 
-async def get_strategic_ai_response(history: str, role: str):
-    # Strategic prompt engineering to prevent "robotic" agreement
+async def get_agentic_response(history: str, role: str, personality: str):
+    # Persona-driven prompt engineering
     prompt = f"""
-    Context: Social Deduction Game. You are '{role}'. 
-    Goal: If imposter, deflect; if crewmate, find the liar. 
+    You are a player in a social deduction game. Role: {role}. Personality: {personality}.
     Chat History: {history}
-    Respond as 'Player_AI' in one short, slightly casual sentence:
+    Goal: Blend in. If you are the imposter, shift blame subtly. 
+    Respond as 'Player_AI' in one short, slightly casual sentence.
     """
     response = model.generate_content(prompt)
     return response.text
 
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await manager.connect(client_id, websocket)
-    
-    # Initialize game if this is the 4th player
-    if len(manager.active_connections) == 4:
-        game.start_game(list(manager.active_connections.keys()))
-        await manager.broadcast({"type": "SYSTEM", "content": "Game Started! Check your secret roles."})
-
+    await conn_manager.connect(client_id, websocket)
     try:
         while True:
-            raw_data = await websocket.receive_text()
-            data = json.loads(raw_data)
-
-            if data["type"] == "CHAT":
-                await manager.broadcast({"type": "MESSAGE", "user": client_id, "content": data["content"]})
+            data = await websocket.receive_json() # Use JSON for structured commands
+            
+            if data["type"] == "MESSAGE":
+                await conn_manager.broadcast({"type": "CHAT", "user": client_id, "text": data["text"]})
                 
-                # AI simulates a "thinking" delay for realism
-                if "sus" in data["content"] or "imposter" in data["content"]:
-                    ai_role = game.players.get("Player_AI", {"role": "crew"})["role"]
-                    reply = await get_strategic_ai_response(data["content"], ai_role)
-                    await manager.broadcast({"type": "MESSAGE", "user": "Player_AI", "content": reply})
-
-            elif data["type"] == "VOTE":
-                target = data["target"]
-                game.players[target]["votes"] += 1
-                await manager.broadcast({"type": "SYSTEM", "content": f"A vote was cast against {target}!"})
+                # Logic: Trigger AI reasoning if suspect keywords appear
+                if any(word in data["text"].lower() for word in ["ai", "sus", "imposter"]):
+                    await asyncio.sleep(2) # Simulated thinking delay
+                    ai_role = manager.players.get("Player_AI", {"role": "crew"})["role"]
+                    reply = await get_agentic_response(data["text"], ai_role, "Defensive but friendly")
+                    await conn_manager.broadcast({"type": "CHAT", "user": "Player_AI", "text": reply})
 
     except WebSocketDisconnect:
-        manager.disconnect(client_id)
+        conn_manager.disconnect(client_id)
